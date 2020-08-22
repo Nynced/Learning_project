@@ -5,7 +5,9 @@ import time
 from policy import Policy
 from env import Env
 
-SHOW_EVERY = 500
+from tqdm import tqdm
+
+SHOW_EVERY = 50
 
 pygame.init()
 
@@ -32,20 +34,12 @@ textRect = text.get_rect()
 textRect.x = 10
 textRect.y = 10
 
-reward = 0
-
 def init_game():
 	global steps_remaining, env, policy
 
 	steps_remaining = NB_STEP_MAX
 	env = Env()
 	policy.env = env
-
-def update_game():
-	global reward
-
-	a = policy.choose_action()
-	reward = env.apply_action(a)
 
 def is_over():
 
@@ -81,14 +75,6 @@ def show_render():
 	for event in pygame.event.get():
 		if event.type == QUIT:
 			pygame.quit()
-			print("247")
-			print(policy.q_table[247][0])
-			print("95")
-			print(policy.q_table[95][0])
-			print("149")
-			print(policy.q_table[149][0])
-			print("182")
-			print(policy.q_table[182][0])
 			sys.exit()
 
 	time.sleep(0.1)
@@ -102,11 +88,10 @@ def show_render():
 
 	pygame.display.update()
 
-for episode in range(policy.EPISODES):
-	
-	if episode % SHOW_EVERY == SHOW_EVERY-1:
+for episode in tqdm(range(1, policy.EPISODES+1), ascii=True, unit='episodes'):
+
+	if episode % SHOW_EVERY == 1:
 		render = True
-		print(episode)
 	else:
 		render = False
 
@@ -114,23 +99,22 @@ for episode in range(policy.EPISODES):
 
 	over = False
 
-	if(render and policy.END_EPSILON_DECAYING < episode):
+	if(render):
 		show_render()
 
 	while not over:
 
-		update_game()
+		action = policy.choose_action()
+		reward = env.apply_action(action)
+		over = is_over()
+
+		policy.update_replay_memory(reward, over)
+		policy.train(over)
 
 		steps_remaining -= 1
 
-		over = is_over()
-
-		policy.update_q_table(reward, over)
-		
-		if(render and policy.END_EPSILON_DECAYING < episode):
+		if(render):
 			show_render()
 
 	if policy.END_EPSILON_DECAYING >= episode >= policy.START_EPSILON_DECAYING:
 		policy.epsilon -= policy.epsilon_decay_value
-
-		
