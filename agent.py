@@ -1,6 +1,6 @@
 class Agent:
 
-	INITIAL_LIFE = 5
+	INITIAL_LIFE = 1000
 
 	def __init__(self, x, y):
 		

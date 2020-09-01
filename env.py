@@ -8,7 +8,9 @@ class Env:
 	NB_CASES_W = 41
 	NB_CASES_H = 41
 
-	VISION_SIZE = 3
+	VISION_SIZE = 2
+	TOTAL_VISION = (2*VISION_SIZE+1)*(2*VISION_SIZE+1)
+	STATE_SIZE = TOTAL_VISION * 2
 
 	MOVE_UP = 0
 	MOVE_DOWN = 1
@@ -19,88 +21,115 @@ class Env:
 	move_shift_x = [0, 0, -1, 1]
 	move_shift_y = [-1, 1, 0, 0]
 
-	CASE_VOID = 0
-	CASE_EMPTY = 1
-	CASE_LIFE = 2
-	CASE_DANGER = 3
-	NB_CASE_TYPES = 4
+	GROUND_VOID = 0
+	GROUND_GRASS = 1
+	GROUND_DIRT = 2
+	NB_GROUND_TYPES = 3
 
-	CASE_2_COLORS = [(0, 0, 0),
-		(128, 128, 128),
-        (0, 255, 0),
-        (0, 0, 255)]
+	OBJ_EMPTY = 0
+	OBJ_LIFE = 1
+	OBJ_DANGER = 2
+	OBJ_CLONE = 3
+	NB_OBJ_TYPES = 4
+
+	GROUND_2_COLOR = [(0, 0, 0),
+		(13, 64, 13),
+	    (50, 38, 13)]
+
+	OBJ_2_COLOR = [(0, 0, 0),
+		(0, 255, 0),
+        (255, 0, 0),
+        (0, 255, 255)]
 
 	def __init__(self):
 
-		self.cases = []
+		self.ground = []
+		self.onground = []
 		self.agent = Agent(self.NB_CASES_W//2, self.NB_CASES_H//2)
 
 		for i in range(self.NB_CASES_W):
-			cases_line = []
+			ground_line = []
+			onground_line = []
 			for j in range(self.NB_CASES_H):
-				cases_line.append(self.init_case())
-			self.cases.append(cases_line)
+				ground_line.append(self.init_ground())
+				onground_line.append(self.init_onground())
+			self.ground.append(ground_line)
+			self.onground.append(onground_line)
 
-		self.cases[self.agent.x][self.agent.y] = self.CASE_EMPTY
+		self.onground[self.agent.x][self.agent.y] = self.OBJ_EMPTY
 
-	def init_case(self):
+	def init_ground(self):
+		return np.random.randint(0, self.NB_GROUND_TYPES-1)+1
 
-		r = int(random()* (self.NB_CASE_TYPES-1) * 2)
+	def init_onground(self):
 
-		if(r == self.CASE_LIFE or r == self.CASE_DANGER):
-			return r
+		r = int(random() * 100)
+
+		if 0 <= r < 20 :
+			return self.OBJ_LIFE
+		elif 20 <= r < 40:
+			return self.OBJ_DANGER
+		elif r == 40:
+			return self.OBJ_CLONE
 		else:
-			return self.CASE_EMPTY
+			return self.OBJ_EMPTY
 
 	def is_over(self):
 
 		return self.agent.life == 0
 
 	def get_state(self):
-		state = np.zeros((2*self.VISION_SIZE+1, 2*self.VISION_SIZE+1, 3), dtype=np.uint8)
+		state = []
 
 		i = 0
 		for x in range(self.agent.x-self.VISION_SIZE, self.agent.x+self.VISION_SIZE+1):
 			j = 0
 			for y in range(self.agent.y-self.VISION_SIZE, self.agent.y+self.VISION_SIZE+1):
 				if(x < 0 or x >= self.NB_CASES_W
-					or y < 0 or y >= self.NB_CASES_H):
-					state[i][j] = self.CASE_2_COLORS[self.CASE_VOID]
+				or y < 0 or y >= self.NB_CASES_H):
+					state.append(self.GROUND_VOID)
+					state.append(self.OBJ_EMPTY)
 				else:
-					state[i][j] = self.CASE_2_COLORS[self.cases[x][y]]
+					state.append(self.ground[x][y])
+					state.append(self.onground[x][y])
 				j += 1
 			i += 1
 
 		return state
 
-
 	def update_cases(self):
 
-		case = self.cases[self.agent.x][self.agent.y]
+		x = self.agent.x
+		y = self.agent.y
+		case = self.onground[x][y]
 		
-		if(case == self.CASE_LIFE):
+		if case == self.OBJ_LIFE:
 			self.agent.life += 1
-			self.cases[self.agent.x][self.agent.y] = self.CASE_EMPTY
-			return 1
-		elif(case == self.CASE_DANGER):
+			self.onground[x][y] = self.OBJ_EMPTY
+		elif case == self.OBJ_DANGER:
 			self.agent.life -= 1
-			return -1
+		elif case == self.OBJ_CLONE:
+			self.onground[x][y] = self.OBJ_EMPTY
+			for i in (x-1, x+1):
+				for j in (y-1, y+1):
+					if(0 <= i < self.NB_CASES_W
+					and 0 <= j < self.NB_CASES_H):
+						self.onground[i][j] = self.OBJ_CLONE
 
-		return 0
 
 	def apply_action(self, a):
 
-		if(a == self.MOVE_UP):
-			if(self.agent.y > 0):
+		if a == self.MOVE_UP:
+			if self.agent.y > 0:
 				self.agent.y -= 1
-		elif(a == self.MOVE_DOWN):
-			if(self.agent.y < self.NB_CASES_H-1):
+		elif a == self.MOVE_DOWN:
+			if self.agent.y < self.NB_CASES_H-1:
 				self.agent.y += 1
-		elif(a == self.MOVE_LEFT):
-			if(self.agent.x > 0):
+		elif a == self.MOVE_LEFT:
+			if self.agent.x > 0:
 				self.agent.x -= 1
-		elif(a == self.MOVE_RIGHT):
-			if(self.agent.x < self.NB_CASES_W-1):
+		elif a == self.MOVE_RIGHT:
+			if self.agent.x < self.NB_CASES_W-1:
 				self.agent.x += 1
 
-		return self.update_cases()
+		self.update_cases()
